@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const { YoutubeTranscript } = require('youtube-transcript');
+const { getSubtitles } = require('youtube-captions-scraper');
 require('dotenv').config();
 
 const app = express();
@@ -27,31 +27,40 @@ app.get('/health', (req, res) => {
 
 app.post('/api/summarize', async (req, res) => {
   try {
-    const { url } = req.body;
+    const { url, transcript } = req.body;
     if (!url) {
       return res.status(400).json({ error: 'YouTube URL is required' });
     }
 
-    const videoId = extractVideoId(url);
-    if (!videoId) {
-      return res.status(400).json({ error: 'Invalid YouTube URL' });
-    }
+    let fullTranscript = '';
 
-    // Fetch transcript
-    let transcriptItems;
-    try {
-      transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
-    } catch (err) {
-      console.error('Transcript Error:', err.message);
-      return res.status(404).json({ error: 'Could not fetch transcript. The video might not have captions, or it might be private/age-restricted.' });
-    }
+    if (transcript && transcript.trim().length > 0) {
+      fullTranscript = transcript.trim();
+    } else {
+      const videoId = extractVideoId(url);
+      if (!videoId) {
+        return res.status(400).json({ error: 'Invalid YouTube URL' });
+      }
 
-    if (!transcriptItems || transcriptItems.length === 0) {
-      return res.status(404).json({ error: 'Transcript is empty' });
-    }
+      // Fetch transcript
+      let transcriptItems;
+      try {
+        transcriptItems = await getSubtitles({
+          videoID: videoId,
+          lang: 'en'
+        });
+      } catch (err) {
+        console.error('Transcript Error:', err.message);
+        return res.status(404).json({ error: 'Could not fetch transcript automatically. The video might not have captions or is restricted. Please paste the transcript manually.' });
+      }
 
-    // Concatenate all transcript text
-    const fullTranscript = transcriptItems.map(item => item.text).join(' ');
+      if (!transcriptItems || transcriptItems.length === 0) {
+        return res.status(404).json({ error: 'Transcript is empty. Please paste the transcript manually.' });
+      }
+
+      // Concatenate all transcript text
+      fullTranscript = transcriptItems.map(item => item.text).join(' ');
+    }
 
     // Prepare request to Gemini
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;

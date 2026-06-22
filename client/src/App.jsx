@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 
 export default function App() {
   const [url, setUrl] = useState('');
+  const [transcript, setTranscript] = useState('');
+  const [showManual, setShowManual] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -81,7 +83,10 @@ export default function App() {
       const res = await fetch(`${apiUrl}/api/summarize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ 
+          url: url.trim(),
+          transcript: transcript.trim() || undefined
+        }),
       });
 
       const data = await res.json();
@@ -118,6 +123,8 @@ export default function App() {
 
   const handleClear = () => {
     setUrl('');
+    setTranscript('');
+    setShowManual(false);
     setResult(null);
     setError(null);
   };
@@ -166,6 +173,31 @@ export default function App() {
                 'Summarize'
               )}
             </button>
+          </div>
+
+          {/* Collapsible Transcript Section */}
+          <div className="mt-4 text-left">
+            <button
+              type="button"
+              onClick={() => setShowManual(!showManual)}
+              className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-2"
+            >
+              <span className="text-xs">{showManual ? '▼' : '▶'}</span>
+              Or paste transcript manually (optional)
+            </button>
+            
+            {showManual && (
+              <div className="mt-3 transition-all duration-300">
+                <textarea
+                  value={transcript}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  placeholder="Paste the video transcript here if auto-fetch fails or if the video is private..."
+                  disabled={loading}
+                  rows={4}
+                  className="w-full px-5 py-4 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-shadow disabled:opacity-50 disabled:cursor-not-allowed text-base shadow-inner resize-y"
+                />
+              </div>
+            )}
           </div>
         </form>
 
