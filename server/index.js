@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const { getSubtitles } = require('youtube-captions-scraper');
 require('dotenv').config();
 
 const app = express();
@@ -42,24 +41,26 @@ app.post('/api/summarize', async (req, res) => {
         return res.status(400).json({ error: 'Invalid YouTube URL' });
       }
 
-      // Fetch transcript
-      let transcriptItems;
       try {
-        transcriptItems = await getSubtitles({
-          videoID: videoId,
-          lang: 'en'
+        const transcriptResponse = await axios.get('https://api.supadata.ai/v1/youtube/transcript', {
+          headers: {
+            'x-api-key': process.env.SUPADATA_API_KEY
+          },
+          params: {
+            url: url,
+            text: true
+          }
         });
+
+        fullTranscript = transcriptResponse.data.content;
       } catch (err) {
-        console.error('Transcript Error:', err.message);
-        return res.status(404).json({ error: 'Could not fetch transcript automatically. The video might not have captions or is restricted. Please paste the transcript manually.' });
+        console.error('Transcript Error:', err.response?.data || err.message);
+        return res.status(400).json({ error: 'Could not fetch transcript automatically. The video might not have captions or is restricted. Please paste the transcript manually.' });
       }
 
-      if (!transcriptItems || transcriptItems.length === 0) {
-        return res.status(404).json({ error: 'Transcript is empty. Please paste the transcript manually.' });
+      if (!fullTranscript) {
+        return res.status(400).json({ error: 'Could not fetch transcript. Please paste it manually.' });
       }
-
-      // Concatenate all transcript text
-      fullTranscript = transcriptItems.map(item => item.text).join(' ');
     }
 
     // Prepare request to Gemini
